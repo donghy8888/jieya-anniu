@@ -42,7 +42,7 @@ html,body{margin:0;height:100%;background:#f3efe7;font-family:-apple-system,"Pin
 <div id="app">
  <div class="card" id="wrap"><h2>气泡膜（手指一路滑过去，捏完自动换一张）</h2><div id="bubbles"></div></div>
  <div class="card" id="big"><button id="red" aria-label="大红按钮"></button></div>
- <div class="card" id="ball"><h2>踩气球（点哪个踩哪个）</h2><div id="field"></div></div>
+ <div class="card" id="ball"><h2>戳气球（点一下就炸）</h2><div id="field"></div></div>
  <div class="card" id="side">
   <h2>开关和机械键</h2>
   <div class="row" id="sws"></div>
@@ -103,11 +103,9 @@ function spawn(){const r=F.getBoundingClientRect();const b=document.createElemen
  b.style.left=Math.max(4,Math.random()*(r.width-80))+'px';b.style.top=Math.max(30,Math.random()*(r.height-110))+'px';b.style.animationDelay=(-Math.random()*2)+'s';
  const hit=e=>{e.preventDefault();e.stopPropagation();if(b.dataset.dead)return;b.dataset.dead=1;stomp(b,c);};
  b.addEventListener('touchstart',hit,{passive:false});b.addEventListener('mousedown',hit);F.appendChild(b);}
-function stomp(b,c){const x=b.offsetLeft+37,y=b.offsetTop+45;const f=document.createElement('div');f.className='foot';f.textContent='🦶';f.style.left=x+'px';f.style.top=y+'px';F.appendChild(f);squeak();
- requestAnimationFrame(()=>requestAnimationFrame(()=>f.classList.add('s')));
- setTimeout(()=>{bang();b.remove();for(let i=0;i<14;i++){const p=document.createElement('div');p.className='bit';p.style.background=c;p.style.left=x+'px';p.style.top=y+'px';F.appendChild(p);const ang=Math.random()*6.28,d=40+Math.random()*70;
-  requestAnimationFrame(()=>requestAnimationFrame(()=>{p.style.transform=`translate(${Math.cos(ang)*d}px,${Math.sin(ang)*d}px) rotate(${Math.random()*360}deg)`;p.style.opacity=0;}));setTimeout(()=>p.remove(),700);}},110);
- setTimeout(()=>{f.style.transition='opacity .3s';f.style.opacity=0;},350);setTimeout(()=>f.remove(),700);
+function stomp(b,c){const x=b.offsetLeft+37,y=b.offsetTop+45;
+ bang();b.remove();for(let i=0;i<14;i++){const p=document.createElement('div');p.className='bit';p.style.background=c;p.style.left=x+'px';p.style.top=y+'px';F.appendChild(p);const ang=Math.random()*6.28,d=40+Math.random()*70;
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{p.style.transform=`translate(${Math.cos(ang)*d}px,${Math.sin(ang)*d}px) rotate(${Math.random()*360}deg)`;p.style.opacity=0;}));setTimeout(()=>p.remove(),700);}
  setTimeout(spawn,900+Math.random()*900);}
 setTimeout(()=>{for(let i=0;i<6;i++)spawn();},50);
 document.addEventListener('touchmove',e=>e.preventDefault(),{passive:false});
