@@ -7,8 +7,8 @@
 <title>解压按钮板</title>
 <style>
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;height:100%;background:#f3efe7;font-family:-apple-system,"PingFang SC",sans-serif;color:#555;-webkit-user-select:none;user-select:none;touch-action:manipulation;overflow:hidden}
-#app{height:100%;display:grid;gap:18px;padding:calc(18px + env(safe-area-inset-top)) 18px calc(18px + env(safe-area-inset-bottom));
+html,body{margin:0;height:100%;background:#f3efe7;font-family:-apple-system,"PingFang SC",sans-serif;color:#555;-webkit-user-select:none;user-select:none;touch-action:manipulation;overflow-x:hidden;overflow-y:auto}
+#app{height:100vh;height:100dvh;display:grid;gap:18px;padding:calc(18px + env(safe-area-inset-top)) 18px calc(18px + env(safe-area-inset-bottom));
  grid-template-columns:1.6fr 1fr 1fr;grid-template-rows:1fr 1fr;grid-template-areas:"wrap big ball" "wrap side ball"}
 
 .card{background:#fff;border-radius:24px;box-shadow:0 6px 24px rgba(0,0,0,.06);padding:16px;display:flex;flex-direction:column;min-height:0}
@@ -36,6 +36,9 @@ html,body{margin:0;height:100%;background:#f3efe7;font-family:-apple-system,"Pin
 .foot.s{transform:translate(-50%,-55%) rotate(0)}
 .bit{position:absolute;width:10px;height:10px;border-radius:3px;pointer-events:none;transition:transform .6s cubic-bezier(.2,.7,.3,1),opacity .6s}
 @media (orientation:portrait){#app{grid-template-columns:1fr 1fr;grid-template-rows:1.5fr 1fr 1fr;grid-template-areas:"wrap wrap" "ball big" "ball side"}}
+#dartcard{margin:0 18px calc(18px + env(safe-area-inset-bottom));height:88vh;height:88dvh}
+#dc{flex:1;width:100%;border-radius:16px;touch-action:none;display:block;min-height:0}
+#hint{position:fixed;left:50%;bottom:10px;transform:translateX(-50%);font-size:13px;color:#aaa;pointer-events:none}
 </style>
 </head>
 <body>
@@ -50,6 +53,7 @@ html,body{margin:0;height:100%;background:#f3efe7;font-family:-apple-system,"Pin
   <div class="row" id="keys2"></div>
  </div>
 </div>
+<div class="card" id="dartcard"><h2>飞镖射气球（按住往上拖，松手发射）</h2><canvas id="dc"></canvas></div>
 <script>
 let ac;
 ['touchstart','touchend','mousedown'].forEach(t=>document.addEventListener(t,()=>{const a=A();if(!a._u){const b=a.createBuffer(1,1,22050),x=a.createBufferSource();x.buffer=b;x.connect(a.destination);x.start(0);a._u=1;}},{capture:true}));
@@ -108,7 +112,48 @@ function stomp(b,c){const x=b.offsetLeft+37,y=b.offsetTop+45;
   requestAnimationFrame(()=>requestAnimationFrame(()=>{p.style.transform=`translate(${Math.cos(ang)*d}px,${Math.sin(ang)*d}px) rotate(${Math.random()*360}deg)`;p.style.opacity=0;}));setTimeout(()=>p.remove(),700);}
  setTimeout(spawn,900+Math.random()*900);}
 setTimeout(()=>{for(let i=0;i<6;i++)spawn();},50);
-document.addEventListener('touchmove',e=>e.preventDefault(),{passive:false});
+
+
+// 飞镖射气球
+(function(){
+const cv=document.getElementById('dc'),cx=cv.getContext('2d');let W=0,H=0,dpr=1;
+function rs(){const r=cv.getBoundingClientRect();dpr=window.devicePixelRatio||1;W=r.width;H=r.height;cv.width=W*dpr;cv.height=H*dpr;cx.setTransform(dpr,0,0,dpr,0,0);}
+rs();window.addEventListener('resize',rs);
+const C=['#ff6b6b','#ffb84d','#ffe066','#69db7c','#4dabf7','#b197fc','#f783ac'];
+let bs=[],darts=[],bits=[],aim=null;
+function nb(start){const r=26+Math.random()*12;return{x:r+Math.random()*(W-2*r),y:start?Math.random()*H*0.7:H+r*2,r,c:C[Math.random()*C.length|0],v:25+Math.random()*30,ph:Math.random()*6};}
+for(let i=0;i<8;i++)bs.push(nb(true));
+function whoosh(){const a=A(),t=a.currentTime,n=noise(.3),f=a.createBiquadFilter(),g=a.createGain();f.type='bandpass';f.Q.value=2;f.frequency.setValueAtTime(600,t);f.frequency.exponentialRampToValueAtTime(3000,t+.2);env(g,t,.35,.25);n.connect(f).connect(g).connect(a.destination);n.start(t);}
+const L=()=>({x:W/2,y:H-30});
+function pt(e){const r=cv.getBoundingClientRect();const t=e.touches?e.changedTouches[0]:e;return{x:t.clientX-r.left,y:t.clientY-r.top};}
+function down(e){e.preventDefault();A();aim=pt(e);}
+function move(e){if(!aim)return;e.preventDefault();aim=pt(e);}
+function up(e){if(!aim)return;e.preventDefault();aim=pt(e);const l=L();let dx=aim.x-l.x,dy=aim.y-l.y;if(dy>-10){dy=-10;}const m=Math.hypot(dx,dy)||1;darts.push({x:l.x,y:l.y,vx:dx/m*1300,vy:dy/m*1300});whoosh();aim=null;}
+cv.addEventListener('touchstart',down,{passive:false});cv.addEventListener('touchmove',move,{passive:false});cv.addEventListener('touchend',up,{passive:false});
+cv.addEventListener('mousedown',down);window.addEventListener('mousemove',move);window.addEventListener('mouseup',up);
+function burst(b){bang();for(let i=0;i<18;i++){const a=Math.random()*6.28,s=80+Math.random()*220;bits.push({x:b.x,y:b.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,c:b.c,l:.7,rot:Math.random()*6});}}
+function drawB(b,t){const sw=Math.sin(t*1.5+b.ph)*3;cx.save();cx.translate(b.x+sw,b.y);
+ cx.strokeStyle='rgba(0,0,0,.25)';cx.lineWidth=1;cx.beginPath();cx.moveTo(0,b.r*1.2);cx.quadraticCurveTo(6,b.r*1.8,0,b.r*2.4);cx.stroke();
+ cx.fillStyle=b.c;cx.beginPath();cx.ellipse(0,0,b.r,b.r*1.2,0,0,6.29);cx.fill();
+ cx.beginPath();cx.moveTo(-5,b.r*1.2+5);cx.lineTo(5,b.r*1.2+5);cx.lineTo(0,b.r*1.2-2);cx.fill();
+ cx.fillStyle='rgba(255,255,255,.45)';cx.beginPath();cx.ellipse(-b.r*.35,-b.r*.45,b.r*.22,b.r*.35,-.5,0,6.29);cx.fill();cx.restore();}
+function drawDart(x,y,ang){cx.save();cx.translate(x,y);cx.rotate(ang);cx.scale(1.7,1.7);cx.fillStyle="#666";cx.fillRect(-34,-2,30,4);cx.fillStyle='#888';cx.beginPath();cx.moveTo(0,0);cx.lineTo(-8,-5);cx.lineTo(-8,5);cx.fill();
+ cx.fillStyle='#ff6b6b';cx.beginPath();cx.moveTo(-34,0);cx.lineTo(-44,-9);cx.lineTo(-38,0);cx.lineTo(-44,9);cx.fill();cx.restore();}
+let last=performance.now();
+function loop(now){const dt=Math.min(.05,(now-last)/1000);last=now;const t=now/1000;
+ const g=cx.createLinearGradient(0,0,0,H);g.addColorStop(0,'#eaf4ff');g.addColorStop(1,'#fdf6ec');cx.fillStyle=g;cx.fillRect(0,0,W,H);
+ bs.forEach(b=>{b.y-=b.v*dt;});bs=bs.filter(b=>b.y>-b.r*3);while(bs.length<8)bs.push(nb(false));
+ bs.forEach(b=>drawB(b,t));
+ darts.forEach(d=>{const st=4;for(let k=0;k<st;k++){d.x+=d.vx*dt/st;d.y+=d.vy*dt/st;for(const b of bs){if(b.dead)continue;const ex=(d.x-b.x)/b.r,ey=(d.y-b.y)/(b.r*1.2);if(ex*ex+ey*ey<1){b.dead=1;burst(b);}}}});
+ bs=bs.filter(b=>!b.dead);darts=darts.filter(d=>d.x>-60&&d.x<W+60&&d.y>-60);
+ darts.forEach(d=>drawDart(d.x,d.y,Math.atan2(d.vy,d.vx)));
+ bits.forEach(p=>{p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=300*dt;p.l-=dt;p.rot+=dt*8;cx.save();cx.globalAlpha=Math.max(0,p.l/.7);cx.translate(p.x,p.y);cx.rotate(p.rot);cx.fillStyle=p.c;cx.fillRect(-5,-4,10,8);cx.restore();});bits=bits.filter(p=>p.l>0);
+ const l=L();let ang=-Math.PI/2;
+ if(aim){ang=Math.atan2(Math.min(aim.y-l.y,-10),aim.x-l.x);cx.setLineDash([6,8]);cx.strokeStyle='rgba(0,0,0,.2)';cx.lineWidth=2;cx.beginPath();cx.moveTo(l.x,l.y);cx.lineTo(l.x+Math.cos(ang)*H,l.y+Math.sin(ang)*H);cx.stroke();cx.setLineDash([]);}
+ drawDart(l.x+Math.cos(ang)*20,l.y+Math.sin(ang)*20,ang);
+ requestAnimationFrame(loop);}
+requestAnimationFrame(loop);
+})();
 </script>
 </body>
 </html>
