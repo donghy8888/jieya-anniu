@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>解压按钮板</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:#f3efe7;font-family:-apple-system,"PingFang SC",sans-serif;color:#555;-webkit-user-select:none;user-select:none;touch-action:manipulation;overflow:hidden}
+#app{height:100%;display:grid;gap:18px;padding:calc(18px + env(safe-area-inset-top)) 18px calc(18px + env(safe-area-inset-bottom));
+ grid-template-columns:1.6fr 1fr 1fr;grid-template-rows:1fr 1fr;grid-template-areas:"wrap big ball" "wrap side ball"}
+
+.card{background:#fff;border-radius:24px;box-shadow:0 6px 24px rgba(0,0,0,.06);padding:16px;display:flex;flex-direction:column;min-height:0}
+.card h2{margin:0 0 10px;font-size:16px;font-weight:600;color:#999}
+#wrap{grid-area:wrap}#big{grid-area:big;align-items:center;justify-content:center}#side{grid-area:side;gap:14px}
+#bubbles{overflow:hidden;touch-action:none;flex:1;display:grid;grid-template-columns:repeat(8,1fr);gap:6px;align-content:center;background:#e9f2f7;border-radius:16px;padding:10px}
+.b{border-radius:50%;aspect-ratio:1;align-self:center;background:radial-gradient(circle at 35% 30%,#fff 0 18%,#cfe6f3 40%,#a9cfe4 100%);box-shadow:inset 0 -3px 6px rgba(0,0,0,.08),0 2px 3px rgba(0,0,0,.08);transition:transform .08s}
+.b input{display:none}
+.b:has(input:checked),.b.p{background:#d8e6ee;box-shadow:inset 0 2px 5px rgba(0,0,0,.15);transform:scale(.86)}
+#red{width:min(46vmin,260px);aspect-ratio:1;border-radius:50%;border:none;background:radial-gradient(circle at 40% 35%,#ff8a7a,#e8473a 60%,#b9271c);box-shadow:0 14px 0 #8f1d14,0 18px 30px rgba(0,0,0,.25);transition:transform .07s,box-shadow .07s}
+#red:active,#red.d{transform:translateY(12px);box-shadow:0 2px 0 #8f1d14,0 5px 10px rgba(0,0,0,.25)}
+.row{display:flex;gap:12px;flex:1}
+.sw{flex:1;border-radius:40px;background:#ddd;position:relative;transition:background .15s;min-height:56px}
+.sw::after{content:"";position:absolute;top:6px;left:6px;width:calc(50% - 6px);bottom:6px;border-radius:40px;background:#fff;box-shadow:0 2px 5px rgba(0,0,0,.2);transition:left .15s}
+.sw.on{background:#8fd19e}.sw.on::after{left:50%}
+.k{flex:1;border-radius:14px;background:#fafafa;border:1px solid #ddd;box-shadow:0 7px 0 #cfcfcf;font-size:22px;color:#aaa;display:flex;align-items:center;justify-content:center;transition:transform .05s,box-shadow .05s;min-height:56px}
+.k:active,.k.d{transform:translateY(6px);box-shadow:0 1px 0 #cfcfcf}
+#ball{grid-area:ball}
+#field{flex:1;position:relative;overflow:hidden;border-radius:16px;background:linear-gradient(#eaf4ff,#fdf6ec);touch-action:none}
+.bl{position:absolute;width:74px;height:90px;border-radius:50% 50% 48% 48%/55% 55% 45% 45%;box-shadow:inset -8px -10px 0 rgba(0,0,0,.12),inset 8px 8px 0 rgba(255,255,255,.35)}
+.bl::after{content:"";position:absolute;left:50%;bottom:-8px;margin-left:-6px;border:6px solid transparent;border-bottom-color:inherit;border-bottom:8px solid;border-bottom-color:var(--c)}
+.bl{animation:wob 2.4s ease-in-out infinite alternate}
+@keyframes wob{from{transform:translateY(0) rotate(-4deg)}to{transform:translateY(-10px) rotate(4deg)}}
+.foot{position:absolute;font-size:64px;transform:translate(-50%,-180%) rotate(-15deg);transition:transform .09s ease-in;pointer-events:none}
+.foot.s{transform:translate(-50%,-55%) rotate(0)}
+.bit{position:absolute;width:10px;height:10px;border-radius:3px;pointer-events:none;transition:transform .6s cubic-bezier(.2,.7,.3,1),opacity .6s}
+@media (orientation:portrait){#app{grid-template-columns:1fr 1fr;grid-template-rows:1.5fr 1fr 1fr;grid-template-areas:"wrap wrap" "ball big" "ball side"}}
+</style>
+</head>
+<body>
+<div id="app">
+ <div class="card" id="wrap"><h2>气泡膜（手指一路滑过去，捏完自动换一张）</h2><div id="bubbles"></div></div>
+ <div class="card" id="big"><button id="red" aria-label="大红按钮"></button></div>
+ <div class="card" id="ball"><h2>踩气球（点哪个踩哪个）</h2><div id="field"></div></div>
+ <div class="card" id="side">
+  <h2>开关和机械键</h2>
+  <div class="row" id="sws"></div>
+  <div class="row" id="keys"></div>
+  <div class="row" id="keys2"></div>
+ </div>
+</div>
+<script>
+let ac;
+['touchstart','touchend','mousedown'].forEach(t=>document.addEventListener(t,()=>{const a=A();if(!a._u){const b=a.createBuffer(1,1,22050),x=a.createBufferSource();x.buffer=b;x.connect(a.destination);x.start(0);a._u=1;}},{capture:true}));
+function A(){ if(!ac){ac=new (window.AudioContext||window.webkitAudioContext)();} if(ac.state!=='running')ac.resume(); return ac;}
+function noise(dur){const a=A(),b=a.createBuffer(1,a.sampleRate*dur,a.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;const s=a.createBufferSource();s.buffer=b;return s;}
+function env(g,t,peak,dec){g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(peak,t+0.003);g.gain.exponentialRampToValueAtTime(0.0001,t+dec);}
+function pop(){const a=A(),t=a.currentTime,n=noise(.12),f=a.createBiquadFilter(),g=a.createGain();f.type='bandpass';f.frequency.value=1200+Math.random()*1500;f.Q.value=1.5;env(g,t,.9,.08);n.connect(f).connect(g).connect(a.destination);n.start(t);
+ const o=a.createOscillator(),g2=a.createGain();o.frequency.setValueAtTime(500+Math.random()*300,t);o.frequency.exponentialRampToValueAtTime(120,t+.06);env(g2,t,.35,.07);o.connect(g2).connect(a.destination);o.start(t);o.stop(t+.1);}
+function thunk(){const a=A(),t=a.currentTime,o=a.createOscillator(),g=a.createGain();o.type='sine';o.frequency.setValueAtTime(160,t);o.frequency.exponentialRampToValueAtTime(45,t+.25);env(g,t,.9,.35);o.connect(g).connect(a.destination);o.start(t);o.stop(t+.4);
+ const n=noise(.05),f=a.createBiquadFilter(),g2=a.createGain();f.type='lowpass';f.frequency.value=900;env(g2,t,.5,.04);n.connect(f).connect(g2).connect(a.destination);n.start(t);}
+function release(){const a=A(),t=a.currentTime,n=noise(.04),f=a.createBiquadFilter(),g=a.createGain();f.type='highpass';f.frequency.value=2500;env(g,t,.25,.03);n.connect(f).connect(g).connect(a.destination);n.start(t);}
+function click(hi){const a=A(),t=a.currentTime,n=noise(.03),f=a.createBiquadFilter(),g=a.createGain();f.type='bandpass';f.frequency.value=hi?4200:2600;f.Q.value=3;env(g,t,.8,.025);n.connect(f).connect(g).connect(a.destination);n.start(t);}
+function clack(down){const a=A(),t=a.currentTime,n=noise(.06),f=a.createBiquadFilter(),g=a.createGain();f.type='bandpass';f.frequency.value=down?1800+Math.random()*400:3200;f.Q.value=2;env(g,t,down?.9:.35,down?.05:.025);n.connect(f).connect(g).connect(a.destination);n.start(t);
+ if(down){const o=a.createOscillator(),g2=a.createGain();o.frequency.value=220+Math.random()*40;env(g2,t,.15,.04);o.connect(g2).connect(a.destination);o.start(t);o.stop(t+.06);}}
+function bang(){const a=A(),t=a.currentTime,n=noise(.4),f=a.createBiquadFilter(),g=a.createGain();f.type='lowpass';f.frequency.setValueAtTime(5000,t);f.frequency.exponentialRampToValueAtTime(300,t+.25);g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(1,t+.002);g.gain.exponentialRampToValueAtTime(0.0001,t+.3);n.connect(f).connect(g).connect(a.destination);n.start(t);
+ const o=a.createOscillator(),g2=a.createGain();o.frequency.setValueAtTime(90,t);o.frequency.exponentialRampToValueAtTime(40,t+.2);env(g2,t,.8,.25);o.connect(g2).connect(a.destination);o.start(t);o.stop(t+.3);}
+function squeak(){const a=A(),t=a.currentTime,o=a.createOscillator(),g=a.createGain();o.type='triangle';o.frequency.setValueAtTime(500,t);o.frequency.linearRampToValueAtTime(800,t+.08);env(g,t,.15,.1);o.connect(g).connect(a.destination);o.start(t);o.stop(t+.12);}
+function crinkle(){for(let i=0;i<14;i++)setTimeout(()=>click(Math.random()>.5),i*25+Math.random()*20);}
+// 气泡膜
+const B=document.getElementById('bubbles');
+const SZ=86;
+function popB(d){if(!d||d.classList.contains('p'))return;d.classList.add('p');pop();if(!B.querySelector('.b:not(.p)'))setTimeout(()=>{crinkle();fillWrap();},500);}
+function fillWrap(){B.innerHTML='';const r=B.getBoundingClientRect();const cols=Math.max(4,Math.floor((r.width-20)/SZ)),rows=Math.max(3,Math.floor((r.height-20)/SZ));
+ B.style.gridTemplateColumns=`repeat(${cols},1fr)`;for(let i=0;i<cols*rows;i++){const d=document.createElement('div');d.className='b';B.appendChild(d);}}
+function at(x,y){const e=document.elementFromPoint(x,y);return e&&e.classList&&e.classList.contains('b')?e:null;}
+let last={};
+function sweep(id,x,y){const l=last[id];if(l){const dx=x-l[0],dy=y-l[1],n=Math.ceil(Math.hypot(dx,dy)/20);for(let i=1;i<=n;i++)popB(at(l[0]+dx*i/n,l[1]+dy*i/n));}else popB(at(x,y));last[id]=[x,y];}
+B.addEventListener('touchstart',e=>{e.preventDefault();for(const t of e.changedTouches)sweep(t.identifier,t.clientX,t.clientY);},{passive:false});
+B.addEventListener('touchmove',e=>{e.preventDefault();for(const t of e.changedTouches)sweep(t.identifier,t.clientX,t.clientY);},{passive:false});
+const endT=e=>{for(const t of e.changedTouches)delete last[t.identifier];};B.addEventListener('touchend',endT);B.addEventListener('touchcancel',endT);
+let md=false;B.addEventListener('mousedown',e=>{md=true;sweep('m',e.clientX,e.clientY);});B.addEventListener('mousemove',e=>{if(md)sweep('m',e.clientX,e.clientY);});
+window.addEventListener('mouseup',()=>{md=false;delete last.m;});
+let rt;window.addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(fillWrap,300);});
+requestAnimationFrame(fillWrap);
+// 大红按钮
+const R=document.getElementById('red');
+const rd=e=>{if(e.type==='touchstart')e.preventDefault();if(R.classList.contains('d'))return;R.classList.add('d');thunk();};R.addEventListener('touchstart',rd,{passive:false});R.addEventListener('mousedown',rd);
+const up=()=>{if(R.classList.contains('d')){R.classList.remove('d');release();}};
+['touchend','touchcancel','mouseup','mouseleave'].forEach(t=>R.addEventListener(t,up));
+// 开关
+const S=document.getElementById('sws');
+for(let i=0;i<3;i++){const s=document.createElement('div');s.className='sw';const tg=e=>{if(e.type==='touchstart')e.preventDefault();s.classList.toggle('on');click(s.classList.contains('on'));};s.addEventListener('touchstart',tg,{passive:false});s.addEventListener('mousedown',tg);S.appendChild(s);}
+// 机械键
+function keys(el,labels){labels.forEach(l=>{const k=document.createElement('div');k.className='k';k.textContent=l;
+ const kd=e=>{if(e.type==='touchstart')e.preventDefault();if(k.classList.contains('d'))return;k.classList.add('d');clack(true);};k.addEventListener('touchstart',kd,{passive:false});k.addEventListener('mousedown',kd);const u=()=>{if(k.classList.contains('d')){k.classList.remove('d');clack(false);}};['touchend','touchcancel','mouseup','mouseleave'].forEach(t=>k.addEventListener(t,u));el.appendChild(k);});}
+keys(document.getElementById('keys'),['咔','嗒','咔','嗒']);
+keys(document.getElementById('keys2'),['','空格','']);
+// 踩气球
+const F=document.getElementById('field'),COLS=['#ff6b6b','#ffb84d','#ffe066','#69db7c','#4dabf7','#b197fc','#f783ac'];
+function spawn(){const r=F.getBoundingClientRect();const b=document.createElement('div');b.className='bl';const c=COLS[Math.random()*COLS.length|0];b.style.background=c;b.style.setProperty('--c',c);b.style.color=c;
+ b.style.left=Math.max(4,Math.random()*(r.width-80))+'px';b.style.top=Math.max(30,Math.random()*(r.height-110))+'px';b.style.animationDelay=(-Math.random()*2)+'s';
+ const hit=e=>{e.preventDefault();e.stopPropagation();if(b.dataset.dead)return;b.dataset.dead=1;stomp(b,c);};
+ b.addEventListener('touchstart',hit,{passive:false});b.addEventListener('mousedown',hit);F.appendChild(b);}
+function stomp(b,c){const x=b.offsetLeft+37,y=b.offsetTop+45;const f=document.createElement('div');f.className='foot';f.textContent='🦶';f.style.left=x+'px';f.style.top=y+'px';F.appendChild(f);squeak();
+ requestAnimationFrame(()=>requestAnimationFrame(()=>f.classList.add('s')));
+ setTimeout(()=>{bang();b.remove();for(let i=0;i<14;i++){const p=document.createElement('div');p.className='bit';p.style.background=c;p.style.left=x+'px';p.style.top=y+'px';F.appendChild(p);const ang=Math.random()*6.28,d=40+Math.random()*70;
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{p.style.transform=`translate(${Math.cos(ang)*d}px,${Math.sin(ang)*d}px) rotate(${Math.random()*360}deg)`;p.style.opacity=0;}));setTimeout(()=>p.remove(),700);}},110);
+ setTimeout(()=>{f.style.transition='opacity .3s';f.style.opacity=0;},350);setTimeout(()=>f.remove(),700);
+ setTimeout(spawn,900+Math.random()*900);}
+setTimeout(()=>{for(let i=0;i<6;i++)spawn();},50);
+document.addEventListener('touchmove',e=>e.preventDefault(),{passive:false});
+</script>
+</body>
+</html>
