@@ -188,19 +188,19 @@ function zipClick(speed){soundNoise(.024,1800+Math.min(4500,speed*2),.06,'bandpa
  },null);
  s.bind(p=>{A();held=Math.abs(p.x-500)<85&&Math.abs(p.y-z-25)<100;oldTooth=Math.floor(z/10);},p=>{if(!held)return;let nz=Math.max(top,Math.min(bottom,p.y-20)),n=Math.floor(nz/10),speed=Math.abs(nz-z)*50;if(n!==oldTooth){const count=Math.min(5,Math.abs(n-oldTooth));for(let i=0;i<count;i++)setTimeout(()=>zipClick(speed),i*7);oldTooth=n;}z=nz;},()=>held=false);
 })();
-// demolition-v2-grounded: Matter.js rigid chunks, explicit structural bonds and grounded sleep audit.
+// demolition-v3-mass-conserving: Matter.js rigid chunks, explicit structural bonds and grounded sleep audit.
 (()=>{
  const {Engine,Bodies,Body,Composite,Events,Sleeping,Vector}=Matter;
  const W=1100,H=800,G=688,cols=14,rows=22,bw=28.5,bh=22.5,left=350,roof=G-rows*bh;
  const engine=Engine.create({enableSleeping:true,positionIterations:6,velocityIterations:4});engine.gravity.y=1.25;
- let blocks=[],bonds=[],chunks=[],dust=[],chips=[],cuts=[],drag=null,quake=0,qtime=0,level=5,shake=0,clock=0,acc=0,rumbleAt=0,impactAt=-1,crackAt=-1,seed=81,pending=new Set(),auditAt=0,damageAt=0,glassAt=-1,baked=[],needsAudit=false;
+ let blocks=[],bonds=[],chunks=[],dust=[],chips=[],cuts=[],drag=null,quake=0,qtime=0,level=5,shake=0,clock=0,acc=0,rumbleAt=0,impactAt=-1,crackAt=-1,seed=81,pending=new Set(),auditAt=0,damageAt=0,glassAt=-1,needsAudit=false;
  const rand=(a,b)=>a+Math.random()*(b-a),random=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
  const opts={friction:.72,frictionStatic:1.1,restitution:.08,frictionAir:.006,sleepThreshold:55,slop:.035};
  let ground;
  function crack(size=1){if(clock-crackAt<.065)return;crackAt=clock;soundNoise(.17,2600,.12*size,'highpass',700);tone(180,55,.1,.09*size,'triangle');}
  function impact(v,m){if(clock-impactAt<.075||v<1.4)return;impactAt=clock;let f=Math.min(1,v/12*Math.sqrt(m/3));soundNoise(.22+f*.4,500+f*1000,.1+f*.24,'lowpass',95);tone(70,27,.26+f*.35,.08+f*.25);soundNoise(.16,3000,.045+f*.08,'highpass',900);}
  function puff(x,y,n=12,p=1){for(let i=0;i<n&&dust.length<110;i++)dust.push({x,y,vx:rand(-55,55)*p,vy:rand(-65,-12)*p,r:rand(4,12),life:rand(.7,1.7),max:1.7});}
- function shards(x,y,n=9){for(let i=0;i<n&&chips.length<160;i++)chips.push({x,y,vx:rand(-140,140),vy:rand(-150,-25),a:rand(0,6),va:rand(-8,8),life:rand(1,2.8),glass:i%3===0,r:rand(1.5,4)});}
+ function shards(x,y,n=9){for(let i=0;i<n&&chips.length<90;i++)chips.push({x,y,vx:rand(-140,140),vy:rand(-150,-25),a:rand(0,6),va:rand(-8,8),life:rand(1,2.8),glass:i%3===0,r:rand(1.5,4)});}
  function glass(x,y,n=18){shards(x,y,n);if(clock-glassAt<.13)return;glassAt=clock;soundNoise(.18,4200,.095,'highpass',1800);for(let i=0;i<4;i++)tone(rand(2600,6800),rand(1800,3800),rand(.08,.25),.014,'sine');}
  // Each facade cell is cached, including brick mortar, concrete aggregate and fixtures.
  function texture(b){const bw=57,bh=45,rows=11;const cv=document.createElement('canvas');cv.width=bw*2;cv.height=bh*2;const c=cv.getContext('2d');c.scale(2,2);let g=c.createLinearGradient(0,0,bw,0);g.addColorStop(0,'#abaaa1');g.addColorStop(.5,'#cfc9b8');g.addColorStop(1,'#9eaaa6');c.fillStyle=g;c.fillRect(0,0,bw,bh);
@@ -214,45 +214,47 @@ function zipClick(speed){soundNoise(.024,1800+Math.min(4500,speed*2),.06,'bandpa
  else if((b.k+b.r)%3===1){c.fillStyle='#4d5e59';c.fillRect(43,29,13,10);c.fillStyle='#d4d1be';c.fillRect(42,28,13,9);c.strokeStyle='#889187';c.lineWidth=.7;c.beginPath();c.arc(47,32.5,3,0,7);c.stroke();for(let z=0;z<4;z++)c.fillRect(51,29+z*2,3,1);}}
  return cv;}
  function staticCell(b){b.body=Bodies.rectangle(b.x,b.y,bw,bh,{...opts,isStatic:true});b.body.cell=b;Composite.add(engine.world,b.body);}
- function init(){Composite.clear(engine.world,false);Engine.clear(engine);blocks=[];bonds=[];chunks=[];dust=[];chips=[];cuts=[];baked=[];pending.clear();quake=0;shake=0;acc=0;seed=81;
- ground=Bodies.rectangle(W/2,G+100,W+2000,200,{isStatic:true,friction:1,restitution:.06});Composite.add(engine.world,ground);
+ function init(){Composite.clear(engine.world,false);Engine.clear(engine);blocks=[];bonds=[];chunks=[];dust=[];chips=[];cuts=[];pending.clear();quake=0;shake=0;acc=0;seed=81;
+ ground=Bodies.rectangle(W/2,G+100,W+2000,200,{isStatic:true,friction:1,restitution:.06});Composite.add(engine.world,[ground,Bodies.rectangle(-30,H/2-400,60,H+1200,{isStatic:true,friction:.8}),Bodies.rectangle(W+30,H/2-400,60,H+1200,{isStatic:true,friction:.8})]);
  const tiles=new Map();for(let r=0;r<rows;r++)for(let k=0;k<cols;k++){let b={id:r*cols+k,r,k,x:left+(k+.5)*bw,y:roof+(r+.5)*bh,lit:random()>.68,live:true,cr:0};let key=Math.floor(r/2)*7+Math.floor(k/2);if(!tiles.has(key))tiles.set(key,texture({...b,r:Math.floor(r/2),k:Math.floor(k/2)}));b.img=tiles.get(key);b.sx=k%2*57;b.sy=r%2*45;blocks.push(b);staticCell(b);}
  blocks.forEach(b=>{if(b.k<cols-1)bonds.push({a:b.id,b:b.id+1,live:true});if(b.r<rows-1)bonds.push({a:b.id,b:b.id+cols,live:true});});}
  function worldCell(ch,c){let v=Vector.rotate({x:c.dx,y:c.dy},ch.body.angle);return {...c.b,x:ch.body.position.x+v.x,y:ch.body.position.y+v.y,a:ch.body.angle+c.da};}
  function makeChunk(items,v={x:0,y:0},spin=0,stage=0){if(!items.length)return;
- if(chunks.length>=110){for(let b of items){shards(b.x,b.y,12);puff(b.x,b.y,3);}return null;}
  // Full rectangular clusters use a single exact OBB rather than hundreds of internal colliders.
  let angle=items[0].a||0,local=items.map(b=>({...Vector.rotate({x:b.x,y:b.y},-angle),w:b.w||bw,h:b.h||bh})),minX=Math.min(...local.map(b=>b.x-b.w/2)),maxX=Math.max(...local.map(b=>b.x+b.w/2)),minY=Math.min(...local.map(b=>b.y-b.h/2)),maxY=Math.max(...local.map(b=>b.y+b.h/2)),area=local.reduce((s,b)=>s+b.w*b.h,0),boxArea=(maxX-minX)*(maxY-minY),body;
  if(Math.abs(area-boxArea)<.1&&items.every(b=>Math.abs((b.a||0)-angle)<.0001)){let center=Vector.rotate({x:(minX+maxX)/2,y:(minY+maxY)/2},angle);body=Bodies.rectangle(center.x,center.y,maxX-minX,maxY-minY,{...opts,angle});}
  else {let parts=items.map(b=>Bodies.rectangle(b.x,b.y,b.w||bw,b.h||bh,{...opts,angle:b.a||0}));body=parts.length===1?parts[0]:Body.create({...opts,parts});}let cells=items.map(b=>{let d=Vector.rotate({x:b.x-body.position.x,y:b.y-body.position.y},-body.angle);return {b,dx:d.x,dy:d.y,da:(b.a||0)-body.angle};});const ch={body,cells,stage,born:clock};body.chunk=ch;chunks.push(ch);Composite.add(engine.world,body);Body.setVelocity(body,v);Body.setAngularVelocity(body,spin);return ch;}
+ function freeze(ch){if(ch.frozen)return;ch.frozen=true;Body.setStatic(ch.body,true);}
+ function unfreezeAll(){for(let ch of chunks)if(ch.frozen){ch.frozen=false;Body.setStatic(ch.body,false);Body.setVelocity(ch.body,{x:0,y:0});Sleeping.set(ch.body,false);}}
  function removeChunk(ch){Composite.remove(engine.world,ch.body);chunks=chunks.filter(q=>q!==ch);pending.delete(ch);}
  function detach(group){let cx=group.reduce((v,b)=>v+b.x,0)/group.length,dir=cx<left+cols*bw*.5?-1:1;
  group.forEach(b=>{b.live=false;Composite.remove(engine.world,b.body);});makeChunk(group.map(b=>({...b})),{x:dir*.65,y:.15},dir*(group.length>5?.004:.012));if(group.length>4){crack(1.2);puff(cx,Math.max(...group.map(b=>b.y)),15);}}
  // Flood only across surviving bonds, seeded EXCLUSIVELY by real foundation cells.
- function supports(){let seen=new Set(),queue=[];const adj=blocks.map(()=>[]);bonds.forEach(e=>{if(e.live&&blocks[e.a].live&&blocks[e.b].live){adj[e.a].push(e.b);adj[e.b].push(e.a);}});blocks.forEach(b=>{if(b.live&&b.r===rows-1&&b.y+bh/2>=G-.1){seen.add(b.id);queue.push(b.id);}});for(let i=0;i<queue.length;i++)for(let id of adj[queue[i]])if(!seen.has(id)){seen.add(id);queue.push(id);}
+ function supports(){unfreezeAll();let seen=new Set(),queue=[];const adj=blocks.map(()=>[]);bonds.forEach(e=>{if(e.live&&blocks[e.a].live&&blocks[e.b].live){adj[e.a].push(e.b);adj[e.b].push(e.a);}});blocks.forEach(b=>{if(b.live&&b.r===rows-1&&b.y+bh/2>=G-.1){seen.add(b.id);queue.push(b.id);}});for(let i=0;i<queue.length;i++)for(let id of adj[queue[i]])if(!seen.has(id)){seen.add(id);queue.push(id);}
  let orphan=blocks.filter(b=>b.live&&!seen.has(b.id));while(orphan.length){let ids=[orphan[0].id],set=new Set(ids);for(let i=0;i<ids.length;i++)for(let id of adj[ids[i]])if(!seen.has(id)&&!set.has(id)){set.add(id);ids.push(id);}detach(ids.map(id=>blocks[id]));orphan=orphan.filter(b=>!set.has(b.id));}
  // Sparse columns cannot support an entire high-rise indefinitely: progressive shear failure.
  for(let r=rows-1;r>0;r--){let feet=blocks.filter(b=>b.live&&b.r===r),above=blocks.filter(b=>b.live&&b.r<r);if(feet.length>0&&feet.length<=4&&above.length>feet.length*7){bonds.forEach(e=>{if(blocks[e.a].r===r-1&&blocks[e.b].r===r)e.live=false;});supports();break;}}
  needsAudit=true;}
  function dist(p,a,b){let dx=b.x-a.x,dy=b.y-a.y,t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/(dx*dx+dy*dy||1)));return Math.hypot(p.x-a.x-t*dx,p.y-a.y-t*dy);}
- function breakCell(b){if(!b.live)return;b.live=false;Composite.remove(engine.world,b.body);bonds.forEach(e=>{if(e.a===b.id||e.b===b.id)e.live=false;});fragments({...b,a:0},{x:rand(-1.2,1.2),y:.2});puff(b.x,b.y,6);glass(b.x,b.y,14);}
- function fragments(b,v){if(chunks.length>100){makeChunk([{...b,w:b.w||bw,h:b.h||bh,broken:true}],v,rand(-.04,.04),2);return;}
- let w=(b.w||bw)/2,h=(b.h||bh)/2;for(let j=0;j<4;j++){let off=Vector.rotate({x:(j%2-.5)*w,y:((j>>1)-.5)*h},b.a||0);let ch=makeChunk([{...b,x:b.x+off.x,y:b.y+off.y,w:w-.5,h:h-.5,broken:true,a:b.a||0}],{x:v.x+rand(-.7,.7),y:v.y+rand(-.8,.1)},rand(-.045,.045),2);}}
+ function breakCell(b){if(!b.live)return;b.live=false;Composite.remove(engine.world,b.body);bonds.forEach(e=>{if(e.a===b.id||e.b===b.id)e.live=false;});makeChunk([{...b,a:0}],{x:rand(-1.2,1.2),y:.2},rand(-.03,.03),2);puff(b.x,b.y,6);glass(b.x,b.y,14);}
  function cut(a,b){let n=0;for(let q of blocks)if(q.live&&dist(q,a,b)<15){breakCell(q);n++;}
  // A cut also severs beams between cells rather than just hiding their artwork.
  for(let e of bonds){if(!e.live)continue;let x=blocks[e.a],y=blocks[e.b],mid={x:(x.x+y.x)/2,y:(x.y+y.y)/2};if(dist(mid,a,b)<8){e.live=false;x.cr=y.cr=1;n++;}}
- for(let ch of chunks.slice()){if(ch.stage===2)continue;let all=ch.cells.map(c=>worldCell(ch,c)),hit=all.filter(q=>dist(q,a,b)<16);if(!hit.length)continue;let v={...ch.body.velocity};removeChunk(ch);for(let q of all){if(hit.includes(q))fragments(q,v);else {makeChunk([{...q,broken:true}],v,rand(-.02,.02),1);}}n++;}
+ for(let ch of chunks.slice()){if(ch.stage===2)continue;let all=ch.cells.map(c=>worldCell(ch,c)),hit=all.filter(q=>dist(q,a,b)<16);if(!hit.length)continue;let v={...ch.body.velocity},w=ch.body.angularVelocity;removeChunk(ch);let rest=all.filter(q=>!hit.includes(q));for(let q of hit)makeChunk([{...q,cr:1}],{x:v.x+rand(-.6,.6),y:v.y},rand(-.03,.03),2);if(rest.length)makeChunk(rest,v,w,rest.length<=4?2:ch.stage);n++;}
  if(n){crack(1.1);supports();}cuts.push({a,b,l:.35});}
- function fracture(ch){if(!chunks.includes(ch))return;let body=ch.body,v={...body.velocity},all=ch.cells.map(c=>worldCell(ch,c));removeChunk(ch);
- if(all.length>1){let groups=new Map();for(let q of all){let key=all.length>20?Math.floor(q.r/2)*7+Math.floor(q.k/2):q.id;if(!groups.has(key))groups.set(key,[]);groups.get(key).push({...q,cr:1});}for(let group of groups.values())makeChunk(group,{x:v.x+rand(-.35,.35),y:v.y*.6},body.angularVelocity+rand(-.012,.012),1);}
- else if(ch.stage<2&&chunks.length<100)fragments(all[0],{x:v.x*.6,y:Math.min(0,v.y*.3)});else makeChunk(all.map(b=>({...b,broken:true})),{x:v.x*.3,y:0},0,2);
- puff(body.position.x,Math.min(G,body.position.y),10,1.2);glass(body.position.x,body.position.y,12);supports();}
+ // Hard impacts split a slab into a few medium sections; nothing ever drops below one window-bay x one storey (2x2 cells).
+ function fracture(ch){if(!chunks.includes(ch)||ch.cells.length<=4){if(ch)ch.stage=2;return;}let body=ch.body,v={...body.velocity},all=ch.cells.map(c=>worldCell(ch,c));removeChunk(ch);
+ let gw=all.length>40?6:2,gh=all.length>40?4:2,groups=new Map();for(let q of all){let key=Math.floor(q.r/gh)*100+Math.floor(q.k/gw);if(!groups.has(key))groups.set(key,[]);groups.get(key).push({...q,cr:1});}
+ for(let group of groups.values())makeChunk(group,{x:v.x+rand(-.3,.3),y:v.y*.55},body.angularVelocity+rand(-.01,.01),group.length<=4?2:1);
+ puff(body.position.x,Math.min(G,body.position.y),10,1.2);glass(body.position.x,body.position.y,12);needsAudit=true;}
  // Contact graph rooted at ground/standing structure. Never leave a sleeping unsupported stack.
  function groundedAudit(){const all=chunks.map(q=>q.body),root=new Set([ground.id,...blocks.filter(q=>q.live).map(q=>q.body.id)]),adj=new Map();
  const link=(a,b)=>{if(!adj.has(a))adj.set(a,[]);adj.get(a).push(b);};for(let p of engine.pairs.list)if(p.isActive){let a=p.bodyA.parent,b=p.bodyB.parent;link(a.id,b.id);link(b.id,a.id);}
  for(let b of all)if(b.bounds.max.y>=G-.8)root.add(b.id);let queue=[...root];for(let i=0;i<queue.length;i++)for(let id of adj.get(queue[i])||[])if(!root.has(id)){root.add(id);queue.push(id);}
- for(let b of all)if(!root.has(b.id)&&b.isSleeping)Sleeping.set(b,false);return all.filter(b=>b.isSleeping&&!root.has(b.id)).length;}
- Events.on(engine,'collisionStart',ev=>{for(let p of ev.pairs){let a=p.bodyA.parent,b=p.bodyB.parent,rel=Math.hypot(a.velocity.x-b.velocity.x,a.velocity.y-b.velocity.y)+Math.abs(a.angularVelocity)*30+Math.abs(b.angularVelocity)*30;let pt=p.collision.supports[0]||a.position;if(rel>1.3){impact(rel,Math.min(20,(a.isStatic?b.mass:a.mass)));puff(pt.x,pt.y,Math.min(8,Math.ceil(rel)),.8);}for(let body of [a,b]){let ch=body.chunk;if(ch&&clock-ch.born>.3&&rel>(ch.stage===0?2.8:7)&&ch.stage<2)pending.add(ch);if(body.cell&&body.cell.live&&rel>7&&clock-damageAt>.08){damageAt=clock;body.cell.cr=1;if(rel>9){breakCell(body.cell);supports();}}}}});
+ for(let b of all)if(!root.has(b.id)&&b.isSleeping)Sleeping.set(b,false);
+ const fixed=new Set(Composite.allBodies(engine.world).filter(b=>b.isStatic).map(b=>b.id));if(quake<=0)for(let ch of chunks){let b=ch.body;if(ch.frozen||!b.isSleeping||!root.has(b.id))continue;if(b.bounds.max.y>=G-1.5||(adj.get(b.id)||[]).some(id=>fixed.has(id)))freeze(ch);}
+ return all.filter(b=>b.isSleeping&&!b.isStatic&&!root.has(b.id)).length;}
+ Events.on(engine,'collisionStart',ev=>{for(let p of ev.pairs){let a=p.bodyA.parent,b=p.bodyB.parent,rel=Math.hypot(a.velocity.x-b.velocity.x,a.velocity.y-b.velocity.y)+Math.abs(a.angularVelocity)*30+Math.abs(b.angularVelocity)*30;let pt=p.collision.supports[0]||a.position;if(rel>1.3){impact(rel,Math.min(20,(a.isStatic?b.mass:a.mass)));puff(pt.x,pt.y,Math.min(8,Math.ceil(rel)),.8);}for(let body of [a,b]){let ch=body.chunk;if(ch&&clock-ch.born>.3&&rel>(ch.stage===0?5:9)&&ch.stage<2&&ch.cells.length>4)pending.add(ch);if(body.cell&&body.cell.live&&rel>7&&clock-damageAt>.08){damageAt=clock;body.cell.cr=1;if(rel>9){breakCell(body.cell);supports();}}}}});
  // Cached facade tiles rotate with their actual rigid body, not an axis-aligned collision proxy.
  function drawCell(c,b,x,y,a=0){let w=b.w||bw,h=b.h||bh;c.save();c.translate(x,y);c.rotate(a);if(!b.broken)c.drawImage(b.img,b.sx||0,b.sy||0,57,45,-w/2,-h/2,w,h);else {c.fillStyle=b.k%2?'#a4a697':'#b9b19c';c.beginPath();c.moveTo(-w/2+2,-h/2);c.lineTo(w/2-3,-h/2+1);c.lineTo(w/2,h*.15);c.lineTo(w/2-2,h/2);c.lineTo(-w/2,h/2-2);c.closePath();c.fill();c.strokeStyle='#5a6459';c.lineWidth=1;c.stroke();c.fillStyle='#c8d7d388';if(w>20)c.fillRect(-w/4,-h/4,w*.3,h*.35);for(let k=0;k<7;k++){c.fillStyle=k%2?'#e0d5b8':'#6c746b';c.fillRect(-w/2+(k*13%w),-h/2+(k*17%h),2,1);}c.strokeStyle='#6b7776';c.beginPath();c.moveTo(-w/2,0);c.lineTo(-w/2-3,3);c.moveTo(w/2-3,h/2-2);c.lineTo(w/2+3,h/2+4);c.stroke();}
  if(b.cr){c.strokeStyle='#dbe6db';c.lineWidth=1;c.beginPath();c.moveTo(-w*.4,-h/2);c.lineTo(-w*.15,-h*.1);c.lineTo(-w*.3,h*.12);c.lineTo(-w*.1,h/2);c.moveTo(-w*.15,-h*.1);c.lineTo(w*.4,-h*.35);c.moveTo(-w*.3,h*.12);c.lineTo(w*.3,h*.25);c.stroke();}
@@ -266,24 +268,24 @@ function zipClick(speed){soundNoise(.024,1800+Math.min(4500,speed*2),.06,'bandpa
  let grd=c.createLinearGradient(0,G,0,H);grd.addColorStop(0,'#9a9b88');grd.addColorStop(.2,'#6c7770');grd.addColorStop(1,'#475958');c.fillStyle=grd;c.fillRect(-100,G,W+200,H-G+100);c.strokeStyle='#e3d9b966';c.beginPath();c.moveTo(0,G+42);c.lineTo(W,G+42);c.stroke();for(let k=0;k<90;k++){c.fillStyle='#273e3833';c.fillRect(k*137%1100,G+8+k*41%103,4,1);}
  c.fillStyle='#344a3e33';c.beginPath();c.ellipse(570,G+3,265,15,0,0,7);c.fill();
  blocks.forEach(b=>{if(b.live)drawCell(c,b,b.x,b.y);});chunks.forEach(ch=>{for(let cell of ch.cells){let q=worldCell(ch,cell);drawCell(c,q,q.x,q.y,q.a);}});
- baked.forEach(p=>{c.save();c.translate(p.x,p.y);c.rotate(p.a);c.fillStyle=p.glass?'#c6ded2':'#a7a28c';c.fillRect(-p.r,-p.r*.4,p.r*2,p.r*.6);c.restore();});chips.forEach(p=>{c.save();c.globalAlpha=Math.min(1,p.life);c.translate(p.x,p.y);c.rotate(p.a);c.fillStyle=p.glass?(Math.sin(p.a*4)>0?'#fff6dc':'#8dbfc7aa'):'#9e9b84';c.beginPath();c.moveTo(-p.r,0);c.lineTo(p.r,-p.r/2);c.lineTo(0,p.r);c.fill();c.restore();});
+ chips.forEach(p=>{c.save();c.globalAlpha=Math.min(1,p.life);c.translate(p.x,p.y);c.rotate(p.a);c.fillStyle=p.glass?(Math.sin(p.a*4)>0?'#fff6dc':'#8dbfc7aa'):'#9e9b84';c.beginPath();c.moveTo(-p.r,0);c.lineTo(p.r,-p.r/2);c.lineTo(0,p.r);c.fill();c.restore();});
  dust.forEach(p=>{c.fillStyle=`rgba(198,185,158,${Math.max(0,p.life/p.max)*.18})`;c.beginPath();c.ellipse(p.x,p.y,p.r*1.4,p.r,0,0,7);c.fill();});cuts.forEach(q=>{c.strokeStyle=`rgba(255,235,178,${Math.max(0,q.l)*2})`;c.lineWidth=2;c.beginPath();c.moveTo(q.a.x,q.a.y);c.lineTo(q.b.x,q.b.y);c.stroke();});c.restore();
  },dt=>{clock+=dt;
  if(quake>0){quake-=dt;qtime+=dt;let force=level/9;shake=(.7+force*10)*Math.min(1,qtime*2)*Math.min(1,quake*2);if(clock-rumbleAt>.4){rumbleAt=clock;soundNoise(.55,75+force*170,.035+force*.13);tone(38,25,.5,.04+force*.1);}
- for(let ch of chunks)if(!ch.body.isSleeping||Math.random()<dt*level){Sleeping.set(ch.body,false);Body.applyForce(ch.body,ch.body.position,{x:Math.sin(qtime*42)*ch.body.mass*.00035*force,y:0});}
+ for(let ch of chunks)if(!ch.frozen&&!ch.body.isSleeping||Math.random()<dt*level){Sleeping.set(ch.body,false);Body.applyForce(ch.body,ch.body.position,{x:Math.sin(qtime*42)*ch.body.mass*.00035*force,y:0});}
  if(level>=4&&Math.random()<dt*(level-2)*2.2){let cand=blocks.filter(b=>b.live&&(level>=7?b.r>=rows-3:true));let b=cand[Math.floor(Math.random()*cand.length)];if(b){b.cr=1;breakCell(b);supports();crack(.65+force*.5);}}
  else if(level<4&&Math.random()<dt*level*1.5){let b=blocks[Math.floor(Math.random()*blocks.length)];if(b.live){b.cr=1;if(level>=3&&Math.random()<.18)glass(b.x,b.y,10);}}
  if(quake<=0){shake=0;if(level===9){for(let b of blocks)if(b.live&&b.r===rows-1)breakCell(b);supports();}document.getElementById('level').disabled=false;}}
  acc+=dt;let steps=0;while(acc>=1/60&&steps++<3){Engine.update(engine,1000/60);acc-=1/60;}for(let ch of [...pending]){pending.delete(ch);fracture(ch);}
- if(needsAudit||clock-auditAt>.12){needsAudit=false;auditAt=clock;groundedAudit();for(let ch of chunks.slice())if(ch.stage===2&&ch.body.isSleeping&&ch.body.bounds.max.y>=G-1){for(let cell of ch.cells){let b=worldCell(ch,cell);baked.push({x:b.x,y:G-2,a:b.a,r:Math.min(9,(b.w||bw)/2),glass:false});}removeChunk(ch);}groundedAudit();}
- // Never truncate live physics bodies. Only offscreen debris is retired; tiny particles fade on the ground.
- for(let ch of chunks.slice())if(ch.body.position.x<-350||ch.body.position.x>W+350||ch.body.position.y>H+300)removeChunk(ch);
- dust.forEach(p=>{p.x+=p.vx*dt;p.y+=p.vy*dt;p.r+=dt*22;p.vy+=12*dt;p.life-=dt;});dust=dust.filter(p=>p.life>0);chips.forEach(p=>{p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=780*dt;p.a+=p.va*dt;p.life-=dt;if(p.y>G){p.y=G;p.vy*=-.16;p.vx*=.6;if(Math.abs(p.vy)<18&&p.life>0){baked.push({x:p.x,y:G-1,a:p.a,r:p.r,glass:p.glass});p.life=0;}}});chips=chips.filter(p=>p.life>0);if(baked.length>500)baked.splice(0,baked.length-500);cuts.forEach(q=>q.l-=dt);cuts=cuts.filter(q=>q.l>0);
+ if(needsAudit||clock-auditAt>.12){needsAudit=false;auditAt=clock;groundedAudit();}
+ // Structural pieces are never deleted; only cosmetic dust and chips fade.
+ dust.forEach(p=>{p.x+=p.vx*dt;p.y+=p.vy*dt;p.r+=dt*22;p.vy+=12*dt;p.life-=dt;});dust=dust.filter(p=>p.life>0);chips.forEach(p=>{p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=780*dt;p.a+=p.va*dt;p.life-=dt;if(p.y>G){p.y=G;p.vy*=-.16;p.vx*=.6;}});chips=chips.filter(p=>p.life>0);cuts.forEach(q=>q.l-=dt);cuts=cuts.filter(q=>q.l>0);
  });
  s.bind(p=>{A();drag=p;cut(p,p);},p=>{if(drag){cut(drag,p);drag=p;}},()=>drag=null);
  const controls=document.querySelector('#buildcard .controls'),picker=document.createElement('div');picker.className='magnitude';picker.innerHTML='<output id="levelout">5级</output><input id="level" aria-label="地震等级" type="range" min="1" max="9" value="5" step="1">';controls.before(picker);
- const out=document.getElementById('levelout');document.getElementById('level').oninput=e=>{level=+e.target.value;out.value=level+'级';};document.getElementById('quake').onclick=()=>{A();quake=2+level*.32;qtime=0;out.value=level+'级';document.getElementById('level').disabled=true;crack(.5);};document.getElementById('rebuild').onclick=()=>{init();document.getElementById('level').disabled=false;soundNoise(.15,700,.09,'bandpass');};
- window.toyState=()=>({version:'demolition-v2-grounded-fine-glass',structuralCells:blocks.length,baked:baked.length,standing:blocks.filter(b=>b.live).length,debris:chunks.length,falling:chunks.filter(ch=>!ch.body.isSleeping).length,level,quake,unsupportedSleeping:groundedAudit(),maxAngle:Math.max(0,...chunks.map(ch=>Math.abs(ch.body.angle))),bodies:Composite.allBodies(engine.world).length});
+ const out=document.getElementById('levelout');document.getElementById('level').oninput=e=>{level=+e.target.value;out.value=level+'级';};document.getElementById('quake').onclick=()=>{A();unfreezeAll();quake=2+level*.32;qtime=0;out.value=level+'级';document.getElementById('level').disabled=true;crack(.5);};document.getElementById('rebuild').onclick=()=>{init();document.getElementById('level').disabled=false;soundNoise(.15,700,.09,'bandpass');};
+ const pieces=()=>{let list=blocks.filter(b=>b.live).map(b=>({x:b.x,y:b.y,w:bw,h:bh}));for(let ch of chunks)for(let c of ch.cells){let q=worldCell(ch,c);list.push({x:q.x,y:q.y,w:q.w||bw,h:q.h||bh});}return list;};
+ window.toyState=()=>{let ps=pieces();return {version:'demolition-v3-mass-conserving',standing:blocks.filter(b=>b.live).length,chunks:chunks.length,frozen:chunks.filter(c=>c.frozen).length,falling:chunks.filter(ch=>!ch.frozen&&!ch.body.isSleeping).length,pieces:ps.length,area:Math.round(ps.reduce((s,p)=>s+p.w*p.h,0)),visible:ps.filter(p=>p.x>-5&&p.x<W+5&&p.y>-200&&p.y<G+5).length,minPiece:Math.min(...ps.map(p=>p.w*p.h)),buildingArea:Math.round(cols*rows*bw*bh),level,quake,unsupportedSleeping:groundedAudit(),bodies:Composite.allBodies(engine.world).length};};
 })();
 </script>
 <style>
